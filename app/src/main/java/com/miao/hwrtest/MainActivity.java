@@ -21,6 +21,7 @@ import android.view.Window;
 
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback{
 
+    private static final int MAX_POINT = 2048;
     private SurfaceHolder surfaceHolder;
     private SurfaceView surface;
     private Paint paint;
@@ -33,6 +34,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private boolean start = true;
     private long init;
     private long now;
+    private int mCurX, mCurY;
+    private int mCurIndex;
+    private short[] mPoints = null;
+    private boolean mEnd;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,6 +53,80 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         paint = new Paint();          // 创建一个画笔对象
         path = new Path();
+
+        mPoints = new short[MAX_POINT * 2];
+        mCurIndex = 0;
+    }
+
+    /**
+     *
+     * @param x
+     * @param y
+     * @return
+     */
+    private boolean addStroke(short x, short y) {
+        if (mCurX >= 0 && mCurY >= 0) {
+            if ((mCurIndex / 2) < (MAX_POINT - 2)) {
+                mPoints[mCurIndex] = x;
+                mCurIndex++;
+                mPoints[mCurIndex] = y;
+                mCurIndex++;
+                return true;
+            } else if ((mCurIndex / 2) == (MAX_POINT - 2)) {
+                mPoints[mCurIndex] = -1;
+                mCurIndex++;
+                mPoints[mCurIndex] = 0;
+                mCurIndex++;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 最后一笔添加坐标(-1,-1)
+     */
+    public void addLastStrokePoint() {
+        if(mCurIndex < 2 ||(mPoints[mCurIndex-1] == -1 && mPoints[mCurIndex-2] == -1))
+        {
+            return;
+        }
+        mPoints[mCurIndex] = -1;
+        mCurIndex++;
+        mPoints[mCurIndex] = -1;
+        mCurIndex++;
+    }
+
+    /**
+     * 每次抬笔添加坐标(-1,0)
+     */
+    private void addStrokeEnd() {
+        mPoints[mCurIndex] = -1;
+        mCurIndex++;
+        mPoints[mCurIndex] = 0;
+        mCurIndex++;
+    }
+
+    /**
+     * 重置笔迹点数据
+     */
+    private void resetStroke() {
+        mPoints = new short[MAX_POINT * 2];
+        mCurIndex = 0;
+    }
+
+    /**
+     * 获取笔迹点数组
+     * @return 笔迹点数组
+     */
+    public short[] getStroke() {
+        mEnd = true;
+        addStrokeEnd();
+        addLastStrokePoint();
+        short[] stroke = new short[mCurIndex];
+        System.arraycopy(mPoints, 0, stroke, 0, mCurIndex);
+
+        return stroke;
     }
 
     /**
@@ -75,15 +154,19 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     if (now - init >= 100 && now - init <= 1000) {      //抬笔操作，加上(-1,0)
-                        Log.d(TAG, "X坐标=" + "-1" + "\tY坐标=" + "0");
+//                        Log.d(TAG, "X坐标=" + "-1" + "\tY坐标=" + "0");
+                        addStrokeEnd();
                     }
                     path.moveTo(event.getX(), event.getY() - top);
-                    Log.d(TAG, "X坐标=" + event.getX() + "\tY坐标=" + event.getY());
+//                    Log.d(TAG, "X坐标=" + event.getX() + "\tY坐标=" + event.getY());
+                    addStroke((short) event.getX(), (short) event.getY());
 
                     break;
                 case MotionEvent.ACTION_MOVE:
                     path.lineTo(event.getX(), event.getY() - top);
-                    Log.d(TAG, "X坐标=" + event.getX() + "\tY坐标=" + event.getY());
+//                    Log.d(TAG, "X坐标=" + event.getX() + "\tY坐标=" + event.getY());
+                    addStroke((short) event.getX(), (short) event.getY());
+
                     break;
                 default:
                     break;
@@ -131,9 +214,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 if (start) {
                     long temp = System.currentTimeMillis() - now;
                     if (temp > 1000) {      //抬笔时间超过1秒，加上坐标(-1,-1)
-                        Log.d(TAG, "X坐标=" + "-1" + "\tY坐标=" + "-1");
+//                        Log.d(TAG, "X坐标=" + "-1" + "\tY坐标=" + "-1");
 
-
+                        short[] data = getStroke();
+                        for (short s : data) {
+                            Log.d(TAG, s + ",");
+                        }
                         start = false;
 
                         clearCanvas();
@@ -159,7 +245,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     canvas = surfaceHolder.lockCanvas();
                     canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
                     path.reset();
-
+                    resetStroke();
+                    mEnd = false;
                 }
             } catch (Exception e) {
                 e.printStackTrace();
