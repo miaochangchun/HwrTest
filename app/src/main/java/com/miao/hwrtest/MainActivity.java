@@ -19,6 +19,10 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.Window;
 
+import com.miao.sinovoice.HciCloudHwrHelper;
+import com.miao.sinovoice.HciCloudSysHelper;
+import com.sinovoice.hcicloudsdk.common.HciErrorCode;
+
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback{
 
     private static final int MAX_POINT = 2048;
@@ -38,6 +42,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private int mCurIndex;
     private short[] mPoints = null;
     private boolean mEnd;
+    private HciCloudSysHelper mHciCloudSysHelper;
+    private HciCloudHwrHelper mHciCloudHwrHelper;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,6 +62,29 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         mPoints = new short[MAX_POINT * 2];
         mCurIndex = 0;
+
+        int errorCode = initSinovoice();
+        Log.d(TAG, "initSinovoice return " + errorCode);
+    }
+
+    /**
+     * 灵云系统初始化
+     * @return
+     */
+    private int initSinovoice() {
+        mHciCloudSysHelper = HciCloudSysHelper.getInstance();
+        mHciCloudHwrHelper = HciCloudHwrHelper.getInstance();
+        int errorCode = mHciCloudSysHelper.init(this);
+        if (errorCode != HciErrorCode.HCI_ERR_NONE) {
+            Log.e(TAG, "mHciCloudSysHelper.init failed and return " + errorCode);
+            return errorCode;
+        }
+        errorCode = mHciCloudHwrHelper.initHwr(this, "hwr.local.letter");
+        if (errorCode != HciErrorCode.HCI_ERR_NONE) {
+            Log.e(TAG, "mHciCloudHwrHelper.initHwr failed and return " + errorCode);
+            return errorCode;
+        }
+        return HciErrorCode.HCI_ERR_NONE;
     }
 
     /**
@@ -159,7 +188,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     }
                     path.moveTo(event.getX(), event.getY() - top);
 //                    Log.d(TAG, "X坐标=" + event.getX() + "\tY坐标=" + event.getY());
-                    addStroke((short) event.getX(), (short) event.getY());
+//                    addStroke((short) event.getX(), (short) event.getY());
 
                     break;
                 case MotionEvent.ACTION_MOVE:
@@ -217,9 +246,13 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 //                        Log.d(TAG, "X坐标=" + "-1" + "\tY坐标=" + "-1");
 
                         short[] data = getStroke();
-                        for (short s : data) {
-                            Log.d(TAG, s + ",");
-                        }
+
+//                        for (short s : data) {
+//                            Log.d(TAG, s + ",");
+//                        }
+                        String result = mHciCloudHwrHelper.recog(data, "hwr.local.letter");
+                        Log.d(TAG, "识别结果是：" + result);
+
                         start = false;
 
                         clearCanvas();
@@ -282,6 +315,19 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     protected void onDestroy() {
+        releaseSinovoice();
         super.onDestroy();
+    }
+
+    /**
+     * 灵云系统反初始化
+     */
+    private void releaseSinovoice() {
+        if (mHciCloudHwrHelper != null) {
+            mHciCloudHwrHelper.releaseHwr();
+        }
+        if (mHciCloudSysHelper != null) {
+            mHciCloudSysHelper.release();
+        }
     }
 }
