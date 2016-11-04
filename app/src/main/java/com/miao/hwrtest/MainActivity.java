@@ -242,7 +242,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 drawView();
                 if (start) {
                     long temp = System.currentTimeMillis() - now;
-                    if (temp > 1000) {      //抬笔时间超过1秒，加上坐标(-1,-1)
+//                    Log.d(TAG, "temp=" + temp);
+                    if (temp > 1000 && temp < 100000) {      //抬笔时间超过1秒，加上坐标(-1,-1)
 //                        Log.d(TAG, "X坐标=" + "-1" + "\tY坐标=" + "-1");
 
                         short[] data = getStroke();
@@ -274,7 +275,6 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         for (int i = 0; i < 4; i++) {
             try {
                 if (surfaceHolder != null) {
-
                     canvas = surfaceHolder.lockCanvas();
                     canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
                     path.reset();
@@ -284,8 +284,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
-                if (canvas != null)
+                if (canvas != null){
                     surfaceHolder.unlockCanvasAndPost(canvas);
+                }
             }
         }
     }

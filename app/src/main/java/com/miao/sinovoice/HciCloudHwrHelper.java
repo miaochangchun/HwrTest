@@ -68,7 +68,8 @@ public class HciCloudHwrHelper {
         for (short s : data) {
             Log.d(TAG, "s = " + s + ",");
         }
-        errorCode = HciCloudHwr.hciHwrRecog(session, data, "", hwrRecogResult);
+        HwrConfig hwrConfig = new HwrConfig();
+        errorCode = HciCloudHwr.hciHwrRecog(session, data, hwrConfig.getStringConfig(), hwrRecogResult);
         if (errorCode != HciErrorCode.HCI_ERR_NONE) {
             Log.e(TAG, "hciHwrRecog failed and return " + errorCode);
             return null;
