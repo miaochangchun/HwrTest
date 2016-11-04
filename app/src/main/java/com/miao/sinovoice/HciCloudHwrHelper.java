@@ -62,14 +62,11 @@ public class HciCloudHwrHelper {
             HciCloudHwr.hciHwrSessionStop(session);
             return null;
         }
-        HwrRecogResult hwrRecogResult = null;
+        //识别结果类进行初始化
+        HwrRecogResult recogResult = new HwrRecogResult();
         //识别的配置串参数可以设置为空，默认就使用sessionConfig配置串参数
-        Log.d(TAG, "session = " + session);
-        for (short s : data) {
-            Log.d(TAG, "s = " + s + ",");
-        }
-        HwrConfig hwrConfig = new HwrConfig();
-        errorCode = HciCloudHwr.hciHwrRecog(session, data, hwrConfig.getStringConfig(), hwrRecogResult);
+
+        errorCode = HciCloudHwr.hciHwrRecog(session, data, "", recogResult);
         if (errorCode != HciErrorCode.HCI_ERR_NONE) {
             Log.e(TAG, "hciHwrRecog failed and return " + errorCode);
             return null;
@@ -82,15 +79,15 @@ public class HciCloudHwrHelper {
             return null;
         }
         //返回识别结果
-//        StringBuilder sb = new StringBuilder();
-//        List<HwrRecogResultItem> lists = hwrRecogResult.getResultItemList();
-//        Iterator<HwrRecogResultItem> iterator = lists.iterator();
-//        while (iterator.hasNext()) {
-//            HwrRecogResultItem item = iterator.next();
-//            sb.append(item.getResult());
-//        }
-//        return sb.toString();
-        return "123";
+        StringBuilder sb = new StringBuilder();
+        List<HwrRecogResultItem> lists = recogResult.getResultItemList();
+        Iterator<HwrRecogResultItem> iterator = lists.iterator();
+        while (iterator.hasNext()) {
+            HwrRecogResultItem item = iterator.next();
+            sb.append(item.getResult()).append(" , ");
+        }
+        return sb.toString();
+//        return recogResult.getResultItemList().get(0).getResult();
     }
 
     /**
@@ -101,6 +98,10 @@ public class HciCloudHwrHelper {
     private String getHwrSessionParam(String capkey) {
         HwrConfig hwrConfig = new HwrConfig();
         hwrConfig.addParam(HwrConfig.SessionConfig.PARAM_KEY_CAP_KEY, capkey);
+        //设置识别结果的候选个数
+        hwrConfig.addParam(HwrConfig.ResultConfig.PARAM_KEY_CAND_NUM, "10");
+        //设置识别结果的范围
+        hwrConfig.addParam(HwrConfig.ResultConfig.PARAM_KEY_RECOG_RANGE, "gbk");
         return hwrConfig.getStringConfig();
     }
 

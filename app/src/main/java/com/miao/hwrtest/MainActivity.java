@@ -8,6 +8,8 @@ import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
 import android.media.MediaRouter;
+import android.os.Handler;
+import android.os.Message;
 import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -18,6 +20,7 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.Window;
+import android.widget.EditText;
 
 import com.miao.sinovoice.HciCloudHwrHelper;
 import com.miao.sinovoice.HciCloudSysHelper;
@@ -44,6 +47,22 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private boolean mEnd;
     private HciCloudSysHelper mHciCloudSysHelper;
     private HciCloudHwrHelper mHciCloudHwrHelper;
+    private EditText myEditText;
+
+    private Handler myHandler = new Handler(){
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.arg1) {
+                case 0:
+                    Bundle bundle = msg.getData();
+                    String result = bundle.getString("result");
+                    myEditText.setText(result);
+                    break;
+                default:
+                    break;
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +70,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_main);
         surface = (SurfaceView) findViewById(R.id.surface);
+        myEditText = (EditText) findViewById(R.id.text);
 
         surfaceHolder = surface.getHolder();        // 获得SurfaceHolder对象
         surface.setZOrderOnTop(true);               //使surface可见
@@ -69,7 +89,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     /**
      * 灵云系统初始化
-     * @return
+     * @return  返回0成功，其他失败
      */
     private int initSinovoice() {
         mHciCloudSysHelper = HciCloudSysHelper.getInstance();
@@ -88,7 +108,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     }
 
     /**
-     *
+     *  把坐标添加到short数组
      * @param x
      * @param y
      * @return
@@ -243,27 +263,24 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 if (start) {
                     long temp = System.currentTimeMillis() - now;
 //                    Log.d(TAG, "temp=" + temp);
-                    if (temp > 1000 && temp < 100000) {      //抬笔时间超过1秒，加上坐标(-1,-1)
+                    if (temp > 1000 && temp < 100000) {      //抬笔时间超过1秒，加上坐标(-1,-1),过滤第一次时间的计算
 //                        Log.d(TAG, "X坐标=" + "-1" + "\tY坐标=" + "-1");
 
                         short[] data = getStroke();
 
-//                        for (short s : data) {
-//                            Log.d(TAG, s + ",");
-//                        }
                         String result = mHciCloudHwrHelper.recog(data, "hwr.local.letter");
-                        Log.d(TAG, "识别结果是：" + result);
+                        Message message = new Message();
+                        message.arg1 = 0;
+                        Bundle bundle = new Bundle();
+                        bundle.putString("result", result);
+                        message.setData(bundle);
+                        myHandler.sendMessage(message);
 
                         start = false;
 
                         clearCanvas();
                     }
                 }
-//                try {
-//                    Thread.sleep(80);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
             }
         }
     };
