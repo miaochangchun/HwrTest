@@ -6,11 +6,13 @@ import android.util.Log;
 import com.sinovoice.hcicloudsdk.api.hwr.HciCloudHwr;
 import com.sinovoice.hcicloudsdk.common.HciErrorCode;
 import com.sinovoice.hcicloudsdk.common.Session;
+import com.sinovoice.hcicloudsdk.common.hwr.HwrAssociateWordsResult;
 import com.sinovoice.hcicloudsdk.common.hwr.HwrConfig;
 import com.sinovoice.hcicloudsdk.common.hwr.HwrInitParam;
 import com.sinovoice.hcicloudsdk.common.hwr.HwrRecogResult;
 import com.sinovoice.hcicloudsdk.common.hwr.HwrRecogResultItem;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
@@ -91,13 +93,56 @@ public class HciCloudHwrHelper {
     }
 
     /**
+     * 联想词功能，对str进行联想，返回联想结果
+     * @param str   需要联想的字符串
+     * @param assCapkey 联想功能对应的capkey。
+     * @return
+     */
+    public String associateWord(String str, String assCapkey){
+        Session session = new Session();
+        String sessionConfig = getAssociateWordSessionParam(assCapkey);
+        int errorCode = HciCloudHwr.hciHwrSessionStart(sessionConfig, session);
+        if (errorCode != HciErrorCode.HCI_ERR_NONE) {
+            Log.e(TAG, "HciCloudHwr.hciHwrSessionStart failed and return " + errorCode);
+        }
+        HwrAssociateWordsResult hwrAssociateWordsResult = new HwrAssociateWordsResult();
+        errorCode = HciCloudHwr.hciHwrAssociateWords(session, str, "", hwrAssociateWordsResult);
+        if (errorCode != HciErrorCode.HCI_ERR_NONE) {
+            Log.e(TAG, "HciCloudHwr.hciHwrAssociateWords failed and return " + errorCode);
+        }
+        errorCode = HciCloudHwr.hciHwrSessionStop(session);
+        if (errorCode != HciErrorCode.HCI_ERR_NONE) {
+            Log.e(TAG, "HciCloudHwr.hciHwrSessionStop failed and return " + errorCode);
+        }
+        ArrayList<String> lists = hwrAssociateWordsResult.getResultList();
+        StringBuilder sb = new StringBuilder();
+        Iterator<String> iterator = lists.iterator();
+        while (iterator.hasNext()) {
+            String string = iterator.next();
+            sb.append(string).append(",");
+        }
+        return  sb.toString();
+    }
+
+    /**
+     * 设置联想词的配置参数
+     * @param assCapkey 联想词功能所需的capkey，需要设置为 assCapkey=hwr.local.associateword
+     * @return  联想词配置的字符串
+     */
+    private String getAssociateWordSessionParam(String assCapkey) {
+        HwrConfig hwrConfig = new HwrConfig();
+        hwrConfig.addParam(HwrConfig.SessionConfig.PARAM_KEY_CAP_KEY, assCapkey);
+        return hwrConfig.getStringConfig();
+    }
+
+    /**
      * 获取手写识别的配置参数
-     * @param capkey    使用的capkey，手写单字识别为hwr.local.letter，多字识别为hwr.local.freestylus，联想功能为hwr.local.associateword
+     * @param hwrCapkey    使用的capkey，手写单字识别为hwr.local.letter，多字识别为hwr.local.freestylus
      * @return  返回配置串
      */
-    private String getHwrSessionParam(String capkey) {
+    private String getHwrSessionParam(String hwrCapkey) {
         HwrConfig hwrConfig = new HwrConfig();
-        hwrConfig.addParam(HwrConfig.SessionConfig.PARAM_KEY_CAP_KEY, capkey);
+        hwrConfig.addParam(HwrConfig.SessionConfig.PARAM_KEY_CAP_KEY, hwrCapkey);
         //设置识别结果的候选个数
         hwrConfig.addParam(HwrConfig.ResultConfig.PARAM_KEY_CAND_NUM, "10");
         //设置识别结果的范围
@@ -108,12 +153,15 @@ public class HciCloudHwrHelper {
     /**
      * 获取手写的初始化配置参数
      * @param context   上下文
-     * @param capkey    使用的capkey，手写单字识别为hwr.local.letter，多字识别为hwr.local.freestylus，联想功能为hwr.local.associateword
+     * @param initCapkeys    使用的capkey，手写单字识别为hwr.local.letter，
+     *                       多字识别为hwr.local.freestylus，
+     *                       联想功能为hwr.local.associateword
+     *                       可以设置多个，中间以分号隔开
      * @return  返回配置串
      */
-    private String getHwrInitParam(Context context, String capkey) {
+    private String getHwrInitParam(Context context, String initCapkeys) {
         HwrInitParam hwrInitParam = new HwrInitParam();
-        hwrInitParam.addParam(HwrInitParam.PARAM_KEY_INIT_CAP_KEYS, capkey);
+        hwrInitParam.addParam(HwrInitParam.PARAM_KEY_INIT_CAP_KEYS, initCapkeys);
         hwrInitParam.addParam(HwrInitParam.PARAM_KEY_FILE_FLAG, "android_so");
         String dataPath = context.getFilesDir().getAbsolutePath().replace("files", "lib");
         hwrInitParam.addParam(HwrInitParam.PARAM_KEY_DATA_PATH, dataPath);
