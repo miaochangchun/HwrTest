@@ -7,23 +7,22 @@ import android.graphics.PaintFlagsDrawFilter;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
-import android.media.MediaRouter;
 import android.os.Handler;
 import android.os.Message;
-import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
-import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.Window;
 import android.widget.EditText;
+import android.widget.Toast;
 
-import com.miao.sinovoice.HciCloudHwrHelper;
-import com.miao.sinovoice.HciCloudSysHelper;
+import com.miao.util.ConfigUtil;
+import com.miao.util.HciCloudHwrHelper;
+import com.miao.util.HciCloudSysHelper;
 import com.sinovoice.hcicloudsdk.common.HciErrorCode;
 
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback{
@@ -69,6 +68,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_main);
+        initView();
+        initSinovoice();
+    }
+
+    private void initView() {
         surface = (SurfaceView) findViewById(R.id.surface);
         myEditText = (EditText) findViewById(R.id.text);
 
@@ -82,29 +86,24 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
         mPoints = new short[MAX_POINT * 2];
         mCurIndex = 0;
-
-        int errorCode = initSinovoice();
-        Log.d(TAG, "initSinovoice return " + errorCode);
     }
 
     /**
      * 灵云系统初始化
-     * @return  返回0成功，其他失败
      */
-    private int initSinovoice() {
+    private void initSinovoice() {
         mHciCloudSysHelper = HciCloudSysHelper.getInstance();
         mHciCloudHwrHelper = HciCloudHwrHelper.getInstance();
         int errorCode = mHciCloudSysHelper.init(this);
         if (errorCode != HciErrorCode.HCI_ERR_NONE) {
-            Log.e(TAG, "mHciCloudSysHelper.init failed and return " + errorCode);
-            return errorCode;
+            Toast.makeText(this, "系统初始化失败，错误码=" + errorCode, Toast.LENGTH_SHORT).show();
+            return;
         }
-        errorCode = mHciCloudHwrHelper.initHwr(this, "hwr.local.letter");
+        errorCode = mHciCloudHwrHelper.initHwr(this, ConfigUtil.CAP_KEY_HWR_LOCAL_LETTER);
         if (errorCode != HciErrorCode.HCI_ERR_NONE) {
-            Log.e(TAG, "mHciCloudHwrHelper.initHwr failed and return " + errorCode);
-            return errorCode;
+            Toast.makeText(this, "手写初始化失败，错误码=" + errorCode, Toast.LENGTH_SHORT).show();
+            return ;
         }
-        return HciErrorCode.HCI_ERR_NONE;
     }
 
     /**
@@ -268,7 +267,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
                         short[] data = getStroke();
 
-                        String result = mHciCloudHwrHelper.recog(data, "hwr.local.letter");
+                        String result = mHciCloudHwrHelper.recog(data, ConfigUtil.CAP_KEY_HWR_LOCAL_LETTER);
                         Message message = new Message();
                         message.arg1 = 0;
                         Bundle bundle = new Bundle();
