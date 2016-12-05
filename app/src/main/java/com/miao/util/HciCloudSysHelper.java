@@ -1,4 +1,4 @@
-package com.miao.sinovoice;
+package com.miao.util;
 
 import android.content.Context;
 import android.os.Environment;
@@ -92,11 +92,11 @@ public class HciCloudSysHelper {
     private String getInitParam(Context context) {
         InitParam initParam = new InitParam();
         //灵云云服务的接口地址，此项必填
-        initParam.addParam(InitParam.AuthParam.PARAM_KEY_APP_KEY, "c85d54f1");
+        initParam.addParam(InitParam.AuthParam.PARAM_KEY_APP_KEY, ConfigUtil.APP_KEY);
         //灵云云服务的接口地址，此项必填
-        initParam.addParam(InitParam.AuthParam.PARAM_KEY_DEVELOPER_KEY, "712ddd892cf9163e6383aa169e0454e3");
+        initParam.addParam(InitParam.AuthParam.PARAM_KEY_DEVELOPER_KEY, ConfigUtil.DEVELOPER_KEY);
         //灵云云服务的接口地址，此项必填
-        initParam.addParam(InitParam.AuthParam.PARAM_KEY_CLOUD_URL, "http://test.api.hcicloud.com:8888");
+        initParam.addParam(InitParam.AuthParam.PARAM_KEY_CLOUD_URL, ConfigUtil.CLOUD_URL);
         String authPath = context.getFilesDir().getAbsolutePath();
         //授权文件所在路径，此项必填
         initParam.addParam(InitParam.AuthParam.PARAM_KEY_AUTH_PATH, authPath);

@@ -1,4 +1,4 @@
-package com.miao.sinovoice;
+package com.miao.util;
 
 import android.content.Context;
 import android.util.Log;
