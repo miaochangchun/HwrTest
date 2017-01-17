@@ -1,7 +1,9 @@
 package com.miao.util;
 
 import android.content.Context;
+import android.os.Environment;
 import android.util.Log;
+import android.webkit.WebView;
 
 import com.sinovoice.hcicloudsdk.api.hwr.HciCloudHwr;
 import com.sinovoice.hcicloudsdk.common.HciErrorCode;
@@ -12,6 +14,10 @@ import com.sinovoice.hcicloudsdk.common.hwr.HwrInitParam;
 import com.sinovoice.hcicloudsdk.common.hwr.HwrRecogResult;
 import com.sinovoice.hcicloudsdk.common.hwr.HwrRecogResultItem;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -51,9 +57,9 @@ public class HciCloudHwrHelper {
      * 手写识别函数
      * @param data  笔迹坐标
      * @param capkey    使用的capkey，手写单字识别为hwr.local.letter，多字识别为hwr.local.freestylus，联想功能为hwr.local.associateword
-     * @return  返回识别的结果
+     * @param listener  识别结果回调函数
      */
-    public String recog(short[] data, String capkey){
+    public void recog(short[] data, String capkey, OnHwrRecogListener listener){
         Session session = new Session();
         String sessionConfig = getHwrSessionParam(capkey);
         Log.d(TAG, "sessionConfig = " + sessionConfig);
@@ -61,35 +67,30 @@ public class HciCloudHwrHelper {
         int errorCode = HciCloudHwr.hciHwrSessionStart(sessionConfig, session);
         if (errorCode != HciErrorCode.HCI_ERR_NONE) {
             Log.e(TAG, "hciHwrSessionStart failed and return " + errorCode);
+            listener.onError(errorCode);
             HciCloudHwr.hciHwrSessionStop(session);
-            return null;
+            return;
         }
+
         //识别结果类进行初始化
         HwrRecogResult recogResult = new HwrRecogResult();
         //识别的配置串参数可以设置为空，默认就使用sessionConfig配置串参数
-
         errorCode = HciCloudHwr.hciHwrRecog(session, data, "", recogResult);
         if (errorCode != HciErrorCode.HCI_ERR_NONE) {
             Log.e(TAG, "hciHwrRecog failed and return " + errorCode);
-            return null;
+            listener.onError(errorCode);
+            return;
+        } else {
+            listener.onHwrResult(recogResult);  //把识别结果传给回调监听
         }
 
         //关闭Session
         errorCode = HciCloudHwr.hciHwrSessionStop(session);
         if (errorCode != HciErrorCode.HCI_ERR_NONE) {
             Log.e(TAG, "hciHwrSessionStop failed and return " + errorCode);
-            return null;
+            listener.onError(errorCode);
+            return ;
         }
-        //返回识别结果
-        StringBuilder sb = new StringBuilder();
-        List<HwrRecogResultItem> lists = recogResult.getResultItemList();
-        Iterator<HwrRecogResultItem> iterator = lists.iterator();
-        while (iterator.hasNext()) {
-            HwrRecogResultItem item = iterator.next();
-            sb.append(item.getResult()).append(" , ");
-        }
-        return sb.toString();
-//        return recogResult.getResultItemList().get(0).getResult();
     }
 
     /**
@@ -147,6 +148,8 @@ public class HciCloudHwrHelper {
         hwrConfig.addParam(HwrConfig.ResultConfig.PARAM_KEY_CAND_NUM, "10");
         //设置识别结果的范围
         hwrConfig.addParam(HwrConfig.ResultConfig.PARAM_KEY_RECOG_RANGE, "gbk");
+        //设置叠写还是行写 line是行写，overlap是叠写
+        hwrConfig.addParam(HwrConfig.InputConfig.PARAM_KEY_SPLIT_MODE, "line");
         return hwrConfig.getStringConfig();
     }
 
@@ -160,12 +163,62 @@ public class HciCloudHwrHelper {
      * @return  返回配置串
      */
     private String getHwrInitParam(Context context, String initCapkeys) {
-        HwrInitParam hwrInitParam = new HwrInitParam();
-        hwrInitParam.addParam(HwrInitParam.PARAM_KEY_INIT_CAP_KEYS, initCapkeys);
-        hwrInitParam.addParam(HwrInitParam.PARAM_KEY_FILE_FLAG, "android_so");
-        String dataPath = context.getFilesDir().getAbsolutePath().replace("files", "lib");
-        hwrInitParam.addParam(HwrInitParam.PARAM_KEY_DATA_PATH, dataPath);
-        return hwrInitParam.getStringConfig();
+        HwrInitParam initParam = new HwrInitParam();
+        initParam.addParam(HwrInitParam.PARAM_KEY_INIT_CAP_KEYS, initCapkeys);
+        initParam.addParam(HwrInitParam.PARAM_KEY_FILE_FLAG, "none");
+        String dataPath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator
+                        + "sinovoice" + File.separator
+                        + context.getPackageName() + File.separator
+                        + "data" + File.separator;
+        //多字识别所需的字典文件
+        String[] strings = {"fwlib.dic", "wwlib.dic", "letter.dic", "letter.conf"};
+        for (String data : strings) {
+            copyAssetsToSdcard(context, data, dataPath);
+        }
+        initParam.addParam(HwrInitParam.PARAM_KEY_DATA_PATH, dataPath);
+        return initParam.getStringConfig();
+    }
+
+    /**
+     * 把手写字典文件拷贝到sd卡
+     * @param context   上下文
+     * @param s         字典文件名称
+     * @param dataPath  sd卡路径
+     */
+    private void copyAssetsToSdcard(Context context, String s, String dataPath) {
+        InputStream inputStream = null;
+        FileOutputStream fos = null;
+        try {
+            File path = new File(dataPath);
+            if (!path.exists()) {
+                path.mkdirs();
+            }
+            fos = new FileOutputStream(dataPath + s);
+            inputStream = context.getAssets().open(s);
+            byte[] buffer = new byte[1024];
+            int len = 0;
+            while ((len = inputStream.read(buffer)) != -1) {
+                fos.write(buffer, 0, len);
+            }
+            fos.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }finally {
+            if (fos != null) {
+                try {
+                    fos.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     /**

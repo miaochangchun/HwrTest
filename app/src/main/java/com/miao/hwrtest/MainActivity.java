@@ -1,5 +1,6 @@
 package com.miao.hwrtest;
 
+import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -13,21 +14,28 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.Window;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.miao.util.ConfigUtil;
 import com.miao.util.HciCloudHwrHelper;
 import com.miao.util.HciCloudSysHelper;
+import com.miao.util.OnHwrRecogListener;
 import com.sinovoice.hcicloudsdk.common.HciErrorCode;
+import com.sinovoice.hcicloudsdk.common.hwr.HwrRecogResult;
 
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback{
 
     private static final int MAX_POINT = 2048;
+    private static final int RECOG_RESULT = 10000;
+    private static final int RECOG_ERROR = 10001;
     private SurfaceHolder surfaceHolder;
     private SurfaceView surface;
     private Paint paint;
@@ -46,17 +54,24 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private boolean mEnd;
     private HciCloudSysHelper mHciCloudSysHelper;
     private HciCloudHwrHelper mHciCloudHwrHelper;
-    private EditText myEditText;
+    private TextView tvResult;
 
-    private Handler myHandler = new Handler(){
+    private Handler myHander = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             switch (msg.arg1) {
-                case 0:
-                    Bundle bundle = msg.getData();
-                    String result = bundle.getString("result");
-                    myEditText.setText(result);
+                case RECOG_RESULT:
+                    Bundle resultBundle = msg.getData();
+                    String result = resultBundle.getString("result");
+                    tvResult.setText(result);
                     break;
+
+                case RECOG_ERROR:
+                    Bundle errorBundle = msg.getData();
+                    String error = errorBundle.getString("error");
+                    Toast.makeText(MainActivity.this, "识别出错，错误码=" + error, Toast.LENGTH_SHORT).show();
+                    break;
+
                 default:
                     break;
             }
@@ -69,12 +84,18 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_main);
         initView();
-        initSinovoice();
+        int errCode = initSinovoice();
+        if (errCode != HciErrorCode.HCI_ERR_NONE) {
+            Toast.makeText(this, "初始化失败，错误码是" + errCode, Toast.LENGTH_SHORT).show();
+        }
     }
 
+    /**
+     * 初始化控件
+     */
     private void initView() {
         surface = (SurfaceView) findViewById(R.id.surface);
-        myEditText = (EditText) findViewById(R.id.text);
+        tvResult = (TextView) findViewById(R.id.text);
 
         surfaceHolder = surface.getHolder();        // 获得SurfaceHolder对象
         surface.setZOrderOnTop(true);               //使surface可见
@@ -90,20 +111,20 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     /**
      * 灵云系统初始化
+     * @return 0成功，其他失败
      */
-    private void initSinovoice() {
+    private int initSinovoice() {
         mHciCloudSysHelper = HciCloudSysHelper.getInstance();
         mHciCloudHwrHelper = HciCloudHwrHelper.getInstance();
         int errorCode = mHciCloudSysHelper.init(this);
         if (errorCode != HciErrorCode.HCI_ERR_NONE) {
-            Toast.makeText(this, "系统初始化失败，错误码=" + errorCode, Toast.LENGTH_SHORT).show();
-            return;
+            return errorCode;
         }
-        errorCode = mHciCloudHwrHelper.initHwr(this, ConfigUtil.CAP_KEY_HWR_LOCAL_LETTER);
+        errorCode = mHciCloudHwrHelper.initHwr(this, ConfigUtil.CAP_KEY_HWR_LOCAL_FREESTYLUS);
         if (errorCode != HciErrorCode.HCI_ERR_NONE) {
-            Toast.makeText(this, "手写初始化失败，错误码=" + errorCode, Toast.LENGTH_SHORT).show();
-            return ;
+            return errorCode;
         }
+        return HciErrorCode.HCI_ERR_NONE;
     }
 
     /**
@@ -202,20 +223,16 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     if (now - init >= 100 && now - init <= 1000) {      //抬笔操作，加上(-1,0)
-//                        Log.d(TAG, "X坐标=" + "-1" + "\tY坐标=" + "0");
                         addStrokeEnd();
                     }
                     path.moveTo(event.getX(), event.getY() - top);
-//                    Log.d(TAG, "X坐标=" + event.getX() + "\tY坐标=" + event.getY());
-//                    addStroke((short) event.getX(), (short) event.getY());
-
                     break;
+
                 case MotionEvent.ACTION_MOVE:
                     path.lineTo(event.getX(), event.getY() - top);
-//                    Log.d(TAG, "X坐标=" + event.getX() + "\tY坐标=" + event.getY());
                     addStroke((short) event.getX(), (short) event.getY());
-
                     break;
+
                 default:
                     break;
             }
@@ -253,7 +270,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         isRunning = false;
     }
 
-    Runnable wlineThread =new Runnable(){
+    Runnable wlineThread = new Runnable(){
 
         @Override
         public void run() {
@@ -263,17 +280,34 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                     long temp = System.currentTimeMillis() - now;
 //                    Log.d(TAG, "temp=" + temp);
                     if (temp > 1000 && temp < 100000) {      //抬笔时间超过1秒，加上坐标(-1,-1),过滤第一次时间的计算
-//                        Log.d(TAG, "X坐标=" + "-1" + "\tY坐标=" + "-1");
-
                         short[] data = getStroke();
 
-                        String result = mHciCloudHwrHelper.recog(data, ConfigUtil.CAP_KEY_HWR_LOCAL_LETTER);
-                        Message message = new Message();
-                        message.arg1 = 0;
-                        Bundle bundle = new Bundle();
-                        bundle.putString("result", result);
-                        message.setData(bundle);
-                        myHandler.sendMessage(message);
+                        mHciCloudHwrHelper.recog(data, ConfigUtil.CAP_KEY_HWR_LOCAL_FREESTYLUS, new OnHwrRecogListener() {
+                            @Override
+                            public void onHwrResult(HwrRecogResult recogResult) {
+                                StringBuilder sBuilder = new StringBuilder();
+                                for (int i=0; i<recogResult.getResultItemList().size(); i++) {
+                                    sBuilder.append(recogResult.getResultItemList().get(i).getResult()).append(";");
+                                }
+                                Message message = new Message();
+                                message.arg1 = RECOG_RESULT;
+                                Bundle bundle = new Bundle();
+                                bundle.putString("result", sBuilder.toString());
+                                message.setData(bundle);
+                                myHander.sendMessage(message);
+                            }
+
+                            @Override
+                            public void onError(int errCode) {
+//                                Toast.makeText(MainActivity.this, "识别出错，错误码是" + errCode, Toast.LENGTH_SHORT).show();
+                                Message message = new Message();
+                                message.arg1 = RECOG_ERROR;
+                                Bundle bundle = new Bundle();
+                                bundle.putString("error", errCode + "");
+                                message.setData(bundle);
+                                myHander.sendMessage(message);
+                            }
+                        });
 
                         start = false;
 
@@ -346,5 +380,21 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         if (mHciCloudSysHelper != null) {
             mHciCloudSysHelper.release();
         }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_settings) {
+            Intent intent = new Intent(this, SettingActivity.class);
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

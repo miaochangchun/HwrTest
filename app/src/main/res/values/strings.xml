@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">HwrTest</string>
     <string name="result">识别结果：</string>
+    <string name="action_settings">设置</string>
 </resources>

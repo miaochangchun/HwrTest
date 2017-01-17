@@ -8,12 +8,12 @@ public class ConfigUtil {
     /**
      * 灵云APP_KEY
      */
-    public static final String APP_KEY = "c85d54f1";
+    public static final String APP_KEY = "0d5d54ba";
 
     /**
      * 开发者密钥
      */
-    public static final String DEVELOPER_KEY = "712ddd892cf9163e6383aa169e0454e3";
+    public static final String DEVELOPER_KEY = "0a9bc46e1a744eb5c1803cbe946db4a2";
 
     /**
      * 灵云云服务的接口地址
